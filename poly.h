@@ -12,7 +12,7 @@ class Poly {
         Poly();
         Poly(const Poly& P);
         Poly(Poly&& P);
-        Poly(int g);
+        explicit Poly(int g);
         ~Poly();
 
         Poly& operator=(const Poly& P);
@@ -29,6 +29,11 @@ class Poly {
         double operator[](int n) const;
         double operator()(int x) const;	
 
+        Poly operator+(const Poly& poly) const;	
+        Poly operator-(const Poly& poly) const;	
+		Poly operator-() const;
+		Poly operator*(const Poly& poly) const;
+        
         friend std::ostream& operator<<(std::ostream& X, const Poly& poly);
         friend std::istream& operator>>(std::istream& X, Poly& poly);
         

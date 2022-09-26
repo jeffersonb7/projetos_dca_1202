@@ -2,6 +2,7 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+#include <math.h>
 
 using namespace std;
 
@@ -9,12 +10,11 @@ Poly::Poly(): grau(-1), a(nullptr) {}
 
 Poly::Poly(const Poly& P): grau(P.grau) {
     delete[] a;
-    
+    a = nullptr;
+
     if (P.grau >= 0) {  
         a = new double(grau + 1);
         for (int i = 0; i <= P.grau; i++) a[i] = P.a[i];
-    } else {
-        a = nullptr;
     }
 }
 
@@ -32,12 +32,12 @@ Poly::Poly(int g): grau(g), a(nullptr) {
         a = new double(grau + 1);
         a[0] = 0.0;
     }
-
 }
 
 Poly::~Poly() {
     if (grau >= 0) delete[] a;
     grau = 0;
+	a = nullptr;
 }
 
 Poly& Poly::operator=(const Poly& P) {
@@ -69,16 +69,16 @@ Poly& Poly::operator=(Poly&& P) {
 
 void Poly::recriar(int g) {
     grau = g;
-    delete[] a;
+    if (grau >= 0) delete[] a;
+	a = nullptr;
+
     if (grau > 0) {
         a = new double(grau+1);
         for (int i = 0; i < grau; i++) a[i] = 0.0;
         a[grau] = 1.0;
     } else if (grau == 0) {
-        a = new double(grau+1);
+        a = new double(1);
         a[0] = 0.0;
-    } else {
-        a = nullptr;
     }
 }
 
@@ -108,7 +108,7 @@ double Poly::getValor(int x) const {
 	if (empty() || isZero()) return 0.0;	
 
 	double valor = 0;
-	for (int i = 0; i <= grau; i++) {
+	for (int i = 0; i <= getGrau(); i++) {
 		valor += getCoef(i)*pow(x,i);
 	}
 	return valor;
@@ -119,13 +119,15 @@ double Poly::operator()(int x) const {
 }
 
 void Poly::setCoef(int i, double v) {
-	if (!(i <= grau && i >= 0)) {
+	if (i > grau && i < 0) {
 		cerr << "Indíce inválido";
-	} else if (i == grau && v == 0.0) { 
-		cerr << "Valor deve ser > 0";
-	} else {
-		a[i] = v;
+		return;
 	}
+	if (getGrau() == i && v == 0.0) { 
+		cerr << "Valor deve ser > 0";
+		return;	
+	}
+	a[i] = v;
 }
 
 ostream& operator<<(ostream& X, const Poly& poly) {
@@ -168,8 +170,8 @@ istream& operator>>(istream& X, Poly& poly) {
 		cerr << "Polinômino vazio!";
 	} else {
 		int i = poly.getGrau();
-		double valor;
 		while (i >= 0) {
+			double valor;			
 			cout << "x^" << i << ": ";
 			cin >> valor;
 			poly.setCoef(i, valor);
@@ -212,7 +214,7 @@ bool Poly::ler(string nome_arquivo) {
 
 	int grau_leitura;
 	arq >> grau_leitura;
-	if (!arq.good() || grau_leitura < 0) {
+	if (arq.good() && grau_leitura < 0) {
 		Poly prov;
 		arq.close();
 		*this = prov;
@@ -220,16 +222,122 @@ bool Poly::ler(string nome_arquivo) {
 	}
 
 	Poly prov(grau_leitura);
-	for (int i = 0; i <= prov.grau; i++) {
-		double valor;
-		arq >> valor;
+	for (int i = 0; i <= prov.getGrau(); i++) {
+		arq >> prov.a[i];
 
-		prov.a[i] = valor;
+		if (arq.eof() || !arq.good()) {
+			arq.close();
+
+			return false;
+		}
 	}
 
-	recriar(prov.grau);
-	for (int i = 0; i <= prov.grau; i++) a[i] = prov.a[i];
+	*this = prov;
 
 	arq.close();
 	return true;
+}
+
+Poly Poly::operator+(const Poly& poly) const {	
+	if (poly.empty() || poly.isZero()) return Poly(*this);
+	if (empty() || isZero()) return Poly(poly);
+
+	Poly aux(max(getGrau(), poly.getGrau()));
+	for (int i = 0; i <= aux.getGrau(); i++) {
+		double coef_soma = 0;
+		
+		if (i <= getGrau()) {
+			coef_soma += a[i];
+		} 
+
+		if (i <= poly.getGrau()) {
+			coef_soma += poly.a[i];
+		}
+		
+		aux.a[i] = coef_soma;
+	}
+
+	if (getGrau() != aux.getGrau()) {
+		int grau_corrigido = aux.getGrau();
+		while (aux.getCoef(grau_corrigido) == 0.0 && grau_corrigido > 0) grau_corrigido--;	
+
+		Poly prov(grau_corrigido);
+		for (int i = 0; i <= grau_corrigido; i++) prov.a[i] = aux.a[i];
+		
+		aux.grau = 0;
+		delete[] aux.a;
+		aux.a = nullptr;
+
+		return prov;
+	}
+
+	return aux;
+}
+
+Poly Poly::operator-(const Poly& poly) const {
+	if (empty() || isZero()) {
+		Poly prov(poly.getGrau());
+		for (int i = 0; i <= poly.getGrau(); i++) {
+			prov.a[i] = - poly.a[i];
+		}
+		return prov;
+	}
+
+	Poly aux(max(getGrau(), poly.getGrau()));
+	for (int i = 0; i <= grau; i++) {
+		double coef_soma = 0;
+		
+		if (i <= getGrau()) {
+			coef_soma += a[i];
+		} 
+
+		if (i <= poly.getGrau()) {
+			coef_soma -= poly.a[i];
+		}
+		
+		aux.a[i] = coef_soma;
+	}
+
+	if (getGrau() != aux.getGrau()) {
+		int grau_corrigido = aux.getGrau();
+		while (aux.getCoef(grau_corrigido) == 0.0 && grau_corrigido > 0) grau_corrigido--;	
+
+		Poly prov(grau_corrigido);
+		for (int i = 0; i <= grau_corrigido; i++) prov.a[i] = aux.a[i];
+		
+		aux.grau = 0;
+		delete[] aux.a;
+		aux.a = nullptr;
+
+		return prov;
+	}
+
+	return aux;
+}
+
+Poly Poly::operator-() const {
+	if (empty()) return Poly();
+	if (isZero()) return Poly(0);
+
+	Poly prov(getGrau());
+	for (int i = 0; i <= prov.getGrau(); i++) {
+		prov.setCoef(i, - (getCoef(i)));
+	}
+
+	return prov;
+}
+
+Poly Poly::operator*(const Poly& poly) const {
+	if (empty() || poly.empty()) return Poly();
+	if (isZero() || poly.isZero()) return Poly(0);
+
+	Poly prov(max(getGrau(), poly.getGrau()));
+	for (int i = 0; i <= getGrau(); i++) {
+		for (int j = 0; j <= getGrau(); j++) {
+			prov.a[i+j] = prov.a[i + j] + getCoef(i) * getCoef(j);
+		}	
+	}
+
+	return prov;
+
 }
